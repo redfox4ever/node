@@ -15,7 +15,7 @@
 #include <zephyr/kernel.h>
 
 #include <zephyr/settings/settings.h>
-
+#include <zephyr/drivers/sensor.h>
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/hci.h>
 #include <zephyr/bluetooth/conn.h>
@@ -25,6 +25,8 @@
 // #include <zephyr/bluetooth/services/cts.h>
 // #include <zephyr/bluetooth/services/hrs.h>
 #include <zephyr/bluetooth/services/ias.h>
+
+
 
 /* Custom Service Variables */
 #define BT_UUID_CUSTOM_SERVICE_VAL \
@@ -42,8 +44,32 @@ static const struct bt_uuid_128 vnd_auth_uuid = BT_UUID_INIT_128(
 
 
 // sensor notification -------------------------------------------------------->
+ struct device *apds9960 ;
+
 static const struct bt_uuid_128 vnd_sensor_uuid = BT_UUID_INIT_128(
 BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef5));
+
+// message characteristic 
+static const struct bt_uuid_128 vnd_msg_uuid = BT_UUID_INIT_128(
+	BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef6));
+#define MSG_MAX_LEN 32
+char msg[MSG_MAX_LEN + 1] = {0};
+
+static ssize_t write_msg(struct bt_conn *conn, const struct bt_gatt_attr *attr,
+			 const void *buf, uint16_t len, uint16_t offset,
+			 uint8_t flags)
+{
+	uint8_t *value = attr->user_data;
+
+	if (offset + len > MSG_MAX_LEN) {
+		return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
+	}
+
+	memcpy(value + offset, buf, len);
+	value[offset + len] = 0;
+
+	return len;
+}
 
 static int16_t sensor_value = 0; 
 static uint8_t sensor_notify_enabled;
@@ -158,6 +184,7 @@ static struct bt_gatt_cep vnd_long_cep = {
 static const struct bt_uuid_128 vnd_write_cmd_uuid = BT_UUID_INIT_128(
 	BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef4));
 
+
 static ssize_t write_without_rsp_vnd(struct bt_conn *conn,
 				     const struct bt_gatt_attr *attr,
 				     const void *buf, uint16_t len, uint16_t offset,
@@ -216,6 +243,13 @@ BT_GATT_SERVICE_DEFINE(vnd_svc,
 	BT_GATT_CCC(sensor_ccc_cfg_changed,
 		    BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
 		// sensor ------------------------------------------------------>
+	
+	// message --------------------------->
+	BT_GATT_CHARACTERISTIC(&vnd_msg_uuid.uuid,
+							BT_GATT_CHRC_WRITE,
+							BT_GATT_PERM_WRITE,
+							NULL, write_msg, &msg)
+	// message --------------------------->
 );
 
 static const struct bt_data ad[] = {
@@ -242,12 +276,21 @@ static struct bt_gatt_cb gatt_callbacks = {
 	.att_mtu_updated = mtu_updated
 };
 
+enum{
+	CONNECTED_FLAG,
+	DISCONNECTED_FLAG,
+	NUMBER_OF_CONNECTION_FLAGS
+};
+
+ATOMIC_DEFINE(connection_flag_bits, NUMBER_OF_CONNECTION_FLAGS);
+
 static void connected(struct bt_conn *conn, uint8_t err)
 {
 	if (err) {
 		printk("Connection failed, err 0x%02x %s\n", err, bt_hci_err_to_str(err));
 	} else {
 		printk("Connected\n");
+		atomic_set_bit(connection_flag_bits, CONNECTED_FLAG);
 	}
 }
 void start_advertising(){
@@ -262,7 +305,7 @@ void start_advertising(){
 static void disconnected(struct bt_conn *conn, uint8_t reason)
 {
 	printk("Disconnected, reason 0x%02x %s\n", reason, bt_hci_err_to_str(reason));
-
+	atomic_set_bit(connection_flag_bits, DISCONNECTED_FLAG);
 }
 
 static void alert_stop(void)
@@ -326,123 +369,18 @@ static struct bt_conn_auth_cb auth_cb_display = {
 	.cancel = auth_cancel,
 };
 
-/*
-static void bas_notify(void)
-{
-	uint8_t battery_level = bt_bas_get_battery_level();
 
-	battery_level--;
-
-	if (!battery_level) {
-		battery_level = 100U;
-	}
-
-	bt_bas_set_battery_level(battery_level);
-}
-
-static uint8_t bt_heartrate = BT_HR_HEARTRATE_DEFAULT_MIN;
-
-static void hrs_notify(void)
-{
-	// Heartrate measurements simulation 
-	bt_heartrate++;
-	if (bt_heartrate == BT_HR_HEARTRATE_DEFAULT_MAX) {
-		bt_heartrate = BT_HR_HEARTRATE_DEFAULT_MIN;
-	}
-
-	bt_hrs_notify(bt_heartrate);
-}
-*/
-
-/**
- * variable to hold reference milliseconds to epoch when device booted
- * this is only for demo purpose, for more precise synchronization please
- * review clock_settime API implementation.
- */
-
-
-/*
-static struct bt_cts_local_time local_time = {
-	.timezone_offset = BT_CTS_TIMEZONE_DEFAULT_VALUE,
-	.dst_offset = BT_CTS_DST_OFFSET_UNKNOWN,
-};
-static bool cts_notification_enabled;
-static int64_t unix_ms_ref;
-
-static void cts_notification_changed_cb(bool enabled)
-{
-	cts_notification_enabled = enabled;
-}
-
-static int cts_time_write_cb(struct bt_cts_time_format *cts_time)
-{
-	int err;
-	int64_t unix_ms;
-
-	if (IS_ENABLED(CONFIG_BT_CTS_HELPER_API)) {
-		err = bt_cts_time_to_unix_ms(cts_time, &unix_ms);
-		if (err != 0) {
-			return err;
-		}
-	} else {
-		return -ENOTSUP;
-	}
-
-	// recalculate reference value 
-	unix_ms_ref = unix_ms - k_uptime_get();
-	return 0;
-}
-
-static int cts_fill_current_cts_time_cb(struct bt_cts_time_format *cts_time)
-{
-	int64_t unix_ms = unix_ms_ref + k_uptime_get();
-
-	if (IS_ENABLED(CONFIG_BT_CTS_HELPER_API)) {
-		return bt_cts_time_from_unix_ms(cts_time, unix_ms);
-	} else {
-		return -ENOTSUP;
-	}
-}
-
-static int cts_local_time_write_cb(const struct bt_cts_local_time *cts_local_time)
-{
-	memcpy(&local_time, cts_local_time, sizeof(local_time));
-	return 0;
-}
-
-static int cts_fill_local_time_cb(struct bt_cts_local_time *cts_local_time)
-{
-	memcpy(cts_local_time, &local_time, sizeof(local_time));
-	return 0;
-}
-
-const struct bt_cts_cb cts_cb = {
-	.notification_changed = cts_notification_changed_cb,
-	.cts_time_write = cts_time_write_cb,
-	.fill_current_cts_time = cts_fill_current_cts_time_cb,
-	.cts_local_time_write = cts_local_time_write_cb,
-	.fill_current_cts_local_time = cts_fill_local_time_cb,
-};
-
-static int bt_hrs_ctrl_point_write(uint8_t request)
-{
-	printk("HRS Control point request: %d\n", request);
-	if (request != BT_HRS_CONTROL_POINT_RESET_ENERGY_EXPANDED_REQ) {
-		return -ENOTSUP;
-	}
-
-	bt_heartrate = BT_HR_HEARTRATE_DEFAULT_MIN;
-	return 0;
-}
-
-
-static struct bt_hrs_cb hrs_cb = {
-	.ctrl_point_write = bt_hrs_ctrl_point_write,
-};
-*/
 
 int main(void)
 {
+	apds9960 = DEVICE_DT_GET_ANY(avago_apds9960);
+	// sensor init
+	    if (!device_is_ready(apds9960)) {
+        printk("APDS9960 not ready\n");
+        return 0;
+    }
+
+
 	struct bt_gatt_attr *vnd_ind_attr;
 	char str[BT_UUID_STR_LEN];
 	int err;
@@ -461,9 +399,11 @@ int main(void)
 	printk("Sensor attr %p\n", sensor_attr);
 	// sensor ------------>
 
+	struct bt_gatt_attr *msg_attr = bt_gatt_find_by_uuid(vnd_svc.attrs, vnd_svc.attr_count,
+				    &vnd_msg_uuid.uuid);
+	printk("Sensor attr %p\n", msg_attr);
 	bt_ready();
-//	bt_cts_init(&cts_cb);
-//	bt_hrs_cb_register(&hrs_cb);
+
 
 	bt_gatt_cb_register(&gatt_callbacks);
 	bt_conn_auth_cb_register(&auth_cb_display);
@@ -473,26 +413,35 @@ int main(void)
 	bt_uuid_to_str(&vnd_enc_uuid.uuid, str, sizeof(str));
 	printk("Indicate VND attr %p (UUID %s)\n", vnd_ind_attr, str);
 
-	/* Implement notification. At the moment there is no suitable way
-	 * of starting delayed work so we do it here
-	 */
-	while (1) {
+	struct sensor_value light, prox, red, green, blue;
+	while (true) {
 		k_sleep(K_SECONDS(1));
+		printf("messga value: %s\n", msg);
 
-		/* Current time update notification example
-		 * For testing purposes, we send a manual update notification every second.
-		 * In production `bt_cts_send_notification` should only be used when time is changed
-		 */
-		/*
-		if (cts_notification_enabled) {
-			bt_cts_send_notification(BT_CTS_UPDATE_REASON_MANUAL);
+
+		///////////////////
+
+        sensor_sample_fetch(apds9960);
+        sensor_channel_get(apds9960, SENSOR_CHAN_LIGHT, &light);
+        sensor_channel_get(apds9960, SENSOR_CHAN_PROX, &prox);
+        sensor_channel_get(apds9960, SENSOR_CHAN_RED, &red);
+        sensor_channel_get(apds9960, SENSOR_CHAN_GREEN, &green);
+        sensor_channel_get(apds9960, SENSOR_CHAN_BLUE, &blue);
+
+		sensor_value = prox.val1;
+
+        printk("light=%d prox=%d r=%d g=%d b=%d\n",
+               light.val1, prox.val1, red.val1, green.val1, blue.val1);
+
+        k_sleep(K_MSEC(1000));
+
+		///////////////////////////////////
+
+		if (atomic_test_and_clear_bit(connection_flag_bits, DISCONNECTED_FLAG))
+		{
+			printf("TRIED TO ADVERTISE ???????????????????\n");
+			start_advertising();
 		}
-		*/
-		/* Heartrate measurements simulation */
-	//	hrs_notify();
-
-		/* Battery level simulation */
-	//	bas_notify();
 
 		/* Vendor indication simulation */
 		if (simulate_vnd && vnd_ind_attr) {
@@ -511,7 +460,7 @@ int main(void)
 			}
 		}
 
-		sensor_value = read_my_sensor(); /* your actual sensor read */
+		//sensor_value = read_my_sensor(); 
 
 		if (sensor_notify_enabled) {
 			bt_gatt_notify(NULL, sensor_attr, &sensor_value, sizeof(sensor_value));
