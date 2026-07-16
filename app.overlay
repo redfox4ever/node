@@ -6,6 +6,12 @@
             drive-open-drain;
             output-high;
         };
+        group2 {
+            pinmux = <I2C0_SDA_GPIO16>, <I2C0_SCL_GPIO17>;
+            bias-pull-up;
+            drive-open-drain;
+            output-high;
+        };
     };
 };
 
@@ -16,6 +22,11 @@
     clock-frequency = <I2C_BITRATE_STANDARD>;
 
     apds9960@39 {
+        compatible = "avago,apds9960";
+        reg = <0x39>;
+       // int-gpios = <&gpio0 4 GPIO_ACTIVE_LOW>; /* optional, wire INT here if used */
+    };
+        apds9960@39 {
         compatible = "avago,apds9960";
         reg = <0x39>;
        // int-gpios = <&gpio0 4 GPIO_ACTIVE_LOW>; /* optional, wire INT here if used */

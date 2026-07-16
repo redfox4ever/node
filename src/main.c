@@ -13,7 +13,7 @@
 #include <zephyr/sys/printk.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/kernel.h>
-
+#include <zephyr/logging/log.h>
 #include <zephyr/settings/settings.h>
 #include <zephyr/drivers/sensor.h>
 #include <zephyr/bluetooth/bluetooth.h>
@@ -25,6 +25,94 @@
 // #include <zephyr/bluetooth/services/cts.h>
 // #include <zephyr/bluetooth/services/hrs.h>
 #include <zephyr/bluetooth/services/ias.h>
+
+#include <sensor.h>
+//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+/*
+struct sensor_value apds9960_light, apds9960_prox, apds9960_red, apds9960_green, apds9960_blue;
+#define SENSOR_WORKQ_STACK_SIZE 2048
+#define SENSOR_WORKQ_PRIO 5
+struct k_work_q sensor_workq;
+struct k_work_delayable sensor_work;
+const struct device *apds9960 = DEVICE_DT_GET_ANY(avago_apds9960);
+K_THREAD_STACK_DEFINE(sensor_workq_stack, SENSOR_WORKQ_STACK_SIZE);
+LOG_MODULE_REGISTER(main_module, LOG_LEVEL_INF);
+static void sensor_work_handler(struct k_work *work) {
+    int err = 0;
+
+    sensor_sample_fetch(apds9960);
+
+    if (0 != err) {
+        LOG_ERR("Failed to fetch sensor reading: %d", err);
+        return;
+    }
+
+
+    sensor_channel_get(apds9960, SENSOR_CHAN_LIGHT, &apds9960_light);
+    err = sensor_channel_get(apds9960, SENSOR_CHAN_PROX, &apds9960_prox);
+    sensor_channel_get(apds9960, SENSOR_CHAN_RED, &apds9960_red);
+    sensor_channel_get(apds9960, SENSOR_CHAN_GREEN, &apds9960_green);
+    sensor_channel_get(apds9960, SENSOR_CHAN_BLUE, &apds9960_blue);
+
+    if (0 != err) {
+        LOG_ERR("Failed to get sensor value: %d", err);
+        return;
+    }
+
+    printf("Proximity reading: %d", apds9960_prox.val1);
+    err = k_work_reschedule_for_queue(	&sensor_workq,
+                                        &sensor_work,
+                                        K_MSEC(500) );
+
+}
+
+void sensor_init(void) {
+    printf("APDS9960 is ready\n");
+    if (!device_is_ready(apds9960)) {
+        printf("APDS9960 not ready\n");
+        return ;
+    }
+    printf("APDS9960 is sdfsd ready\n");
+    k_work_queue_start(&sensor_workq,
+                       sensor_workq_stack,
+                       K_THREAD_STACK_SIZEOF(sensor_workq_stack),
+                       SENSOR_WORKQ_PRIO,
+                       NULL);
+    k_work_init_delayable(&sensor_work, sensor_work_handler);
+
+    
+    int err = 0;
+
+    err = sensor_sample_fetch(apds9960);
+
+    if (0 != err) {
+        LOG_ERR("Failed to fetch sensor reading: %d", err);
+        return;
+    }
+
+	
+    sensor_channel_get(apds9960, SENSOR_CHAN_LIGHT, &apds9960_light);
+    err = sensor_channel_get(apds9960, SENSOR_CHAN_PROX, &apds9960_prox);
+    sensor_channel_get(apds9960, SENSOR_CHAN_RED, &apds9960_red);
+    sensor_channel_get(apds9960, SENSOR_CHAN_GREEN, &apds9960_green);
+    sensor_channel_get(apds9960, SENSOR_CHAN_BLUE, &apds9960_blue);
+
+    if (0 != err) {
+        LOG_ERR("Failed to get sensor value: %d", err);
+        return;
+    }
+	printf("here	\n");
+    printf("Proximity reading: %d", apds9960_prox.val1);
+
+    k_work_schedule_for_queue(&sensor_workq, &sensor_work, K_MSEC(50));
+}
+*/
+//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
+
 
 
 
@@ -44,7 +132,7 @@ static const struct bt_uuid_128 vnd_auth_uuid = BT_UUID_INIT_128(
 
 
 // sensor notification -------------------------------------------------------->
- struct device *apds9960 ;
+
 
 static const struct bt_uuid_128 vnd_sensor_uuid = BT_UUID_INIT_128(
 BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef5));
@@ -373,13 +461,13 @@ static struct bt_conn_auth_cb auth_cb_display = {
 
 int main(void)
 {
-	apds9960 = DEVICE_DT_GET_ANY(avago_apds9960);
-	// sensor init
+	/*
 	    if (!device_is_ready(apds9960)) {
         printk("APDS9960 not ready\n");
         return 0;
     }
-
+		*/
+	printf("getting started ...");
 
 	struct bt_gatt_attr *vnd_ind_attr;
 	char str[BT_UUID_STR_LEN];
@@ -413,28 +501,28 @@ int main(void)
 	bt_uuid_to_str(&vnd_enc_uuid.uuid, str, sizeof(str));
 	printk("Indicate VND attr %p (UUID %s)\n", vnd_ind_attr, str);
 
-	struct sensor_value light, prox, red, green, blue;
+	printf("about to initialize the sensor:\n");
+	sensor_init();
 	while (true) {
 		k_sleep(K_SECONDS(1));
 		printf("messga value: %s\n", msg);
 
-
+		
 		///////////////////
-
+		/*
         sensor_sample_fetch(apds9960);
-        sensor_channel_get(apds9960, SENSOR_CHAN_LIGHT, &light);
-        sensor_channel_get(apds9960, SENSOR_CHAN_PROX, &prox);
-        sensor_channel_get(apds9960, SENSOR_CHAN_RED, &red);
-        sensor_channel_get(apds9960, SENSOR_CHAN_GREEN, &green);
-        sensor_channel_get(apds9960, SENSOR_CHAN_BLUE, &blue);
-
-		sensor_value = prox.val1;
+        sensor_channel_get(apds9960, SENSOR_CHAN_LIGHT, &apds9960_light);
+        sensor_channel_get(apds9960, SENSOR_CHAN_PROX, &apds9960_prox);
+        sensor_channel_get(apds9960, SENSOR_CHAN_RED, &apds9960_red);
+        sensor_channel_get(apds9960, SENSOR_CHAN_GREEN, &apds9960_green);
+        sensor_channel_get(apds9960, SENSOR_CHAN_BLUE, &apds9960_blue);
+		sensor_value = apds9960_prox.val1;
 
         printk("light=%d prox=%d r=%d g=%d b=%d\n",
-               light.val1, prox.val1, red.val1, green.val1, blue.val1);
+               apds9960_light.val1, apds9960_prox.val1, apds9960_red.val1, apds9960_green.val1, apds9960_blue.val1);
 
         k_sleep(K_MSEC(1000));
-
+		*/
 		///////////////////////////////////
 
 		if (atomic_test_and_clear_bit(connection_flag_bits, DISCONNECTED_FLAG))
@@ -460,7 +548,7 @@ int main(void)
 			}
 		}
 
-		//sensor_value = read_my_sensor(); 
+		sensor_value = (int16_t)apds9960_prox.val1; 
 
 		if (sensor_notify_enabled) {
 			bt_gatt_notify(NULL, sensor_attr, &sensor_value, sizeof(sensor_value));
