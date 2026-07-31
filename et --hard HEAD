@@ -1,0 +1,17 @@
+[33mcommit f317dd5ac0fc3985e6fbcbb92bfd60dc285508a7[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: RedFox <azizayari879@gmail.com>
+Date:   Thu Jul 16 13:58:56 2026 +0100
+
+    add sensor
+
+[33mcommit 38005b9dd41da7c9a7840d5ae777b999f465035f[m
+Author: RedFox <azizayari879@gmail.com>
+Date:   Tue Jul 14 19:36:25 2026 +0100
+
+    bt sending apds9960 proximity data
+
+[33mcommit 80d60392bac84ac3e23b94367faa492706f7903d[m
+Author: RedFox <azizayari879@gmail.com>
+Date:   Sun Jul 12 22:15:01 2026 +0100
+
+    initial commit

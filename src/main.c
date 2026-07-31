@@ -1,10 +1,4 @@
-/* main.c - Application main entry point */
 
-/*
- * Copyright (c) 2015-2016 Intel Corporation
- *
- * SPDX-License-Identifier: Apache-2.0
- */
 // TODO: add atoms to track connected / disconnected states, and call start_advertising when you dc
 #include <zephyr/types.h>
 #include <stddef.h>
@@ -21,97 +15,8 @@
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/bluetooth/gatt.h>
-// #include <zephyr/bluetooth/services/bas.h>
-// #include <zephyr/bluetooth/services/cts.h>
-// #include <zephyr/bluetooth/services/hrs.h>
 #include <zephyr/bluetooth/services/ias.h>
-
 #include <sensor.h>
-//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-/*
-struct sensor_value apds9960_light, apds9960_prox, apds9960_red, apds9960_green, apds9960_blue;
-#define SENSOR_WORKQ_STACK_SIZE 2048
-#define SENSOR_WORKQ_PRIO 5
-struct k_work_q sensor_workq;
-struct k_work_delayable sensor_work;
-const struct device *apds9960 = DEVICE_DT_GET_ANY(avago_apds9960);
-K_THREAD_STACK_DEFINE(sensor_workq_stack, SENSOR_WORKQ_STACK_SIZE);
-LOG_MODULE_REGISTER(main_module, LOG_LEVEL_INF);
-static void sensor_work_handler(struct k_work *work) {
-    int err = 0;
-
-    sensor_sample_fetch(apds9960);
-
-    if (0 != err) {
-        LOG_ERR("Failed to fetch sensor reading: %d", err);
-        return;
-    }
-
-
-    sensor_channel_get(apds9960, SENSOR_CHAN_LIGHT, &apds9960_light);
-    err = sensor_channel_get(apds9960, SENSOR_CHAN_PROX, &apds9960_prox);
-    sensor_channel_get(apds9960, SENSOR_CHAN_RED, &apds9960_red);
-    sensor_channel_get(apds9960, SENSOR_CHAN_GREEN, &apds9960_green);
-    sensor_channel_get(apds9960, SENSOR_CHAN_BLUE, &apds9960_blue);
-
-    if (0 != err) {
-        LOG_ERR("Failed to get sensor value: %d", err);
-        return;
-    }
-
-    printf("Proximity reading: %d", apds9960_prox.val1);
-    err = k_work_reschedule_for_queue(	&sensor_workq,
-                                        &sensor_work,
-                                        K_MSEC(500) );
-
-}
-
-void sensor_init(void) {
-    printf("APDS9960 is ready\n");
-    if (!device_is_ready(apds9960)) {
-        printf("APDS9960 not ready\n");
-        return ;
-    }
-    printf("APDS9960 is sdfsd ready\n");
-    k_work_queue_start(&sensor_workq,
-                       sensor_workq_stack,
-                       K_THREAD_STACK_SIZEOF(sensor_workq_stack),
-                       SENSOR_WORKQ_PRIO,
-                       NULL);
-    k_work_init_delayable(&sensor_work, sensor_work_handler);
-
-    
-    int err = 0;
-
-    err = sensor_sample_fetch(apds9960);
-
-    if (0 != err) {
-        LOG_ERR("Failed to fetch sensor reading: %d", err);
-        return;
-    }
-
-	
-    sensor_channel_get(apds9960, SENSOR_CHAN_LIGHT, &apds9960_light);
-    err = sensor_channel_get(apds9960, SENSOR_CHAN_PROX, &apds9960_prox);
-    sensor_channel_get(apds9960, SENSOR_CHAN_RED, &apds9960_red);
-    sensor_channel_get(apds9960, SENSOR_CHAN_GREEN, &apds9960_green);
-    sensor_channel_get(apds9960, SENSOR_CHAN_BLUE, &apds9960_blue);
-
-    if (0 != err) {
-        LOG_ERR("Failed to get sensor value: %d", err);
-        return;
-    }
-	printf("here	\n");
-    printf("Proximity reading: %d", apds9960_prox.val1);
-
-    k_work_schedule_for_queue(&sensor_workq, &sensor_work, K_MSEC(50));
-}
-*/
-//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
-
-
 
 
 
@@ -131,11 +36,8 @@ static const struct bt_uuid_128 vnd_auth_uuid = BT_UUID_INIT_128(
 
 
 
-// sensor notification -------------------------------------------------------->
 
 
-static const struct bt_uuid_128 vnd_sensor_uuid = BT_UUID_INIT_128(
-BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef5));
 
 // message characteristic 
 static const struct bt_uuid_128 vnd_msg_uuid = BT_UUID_INIT_128(
@@ -159,6 +61,11 @@ static ssize_t write_msg(struct bt_conn *conn, const struct bt_gatt_attr *attr,
 	return len;
 }
 
+
+
+// sensor notification -------------------------------------------------------->
+static const struct bt_uuid_128 vnd_sensor_uuid = BT_UUID_INIT_128(
+BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef5));
 static int16_t sensor_value = 0; 
 static uint8_t sensor_notify_enabled;
 static void sensor_ccc_cfg_changed(const struct bt_gatt_attr *attr, uint16_t value)
@@ -177,6 +84,68 @@ static ssize_t read_sensor(struct bt_conn *conn, const struct bt_gatt_attr *attr
 				  &sensor_value, sizeof(sensor_value));
 }
 // sensor notification -------------------------------------------------------->
+
+
+// command -------------------------------------------------------------->
+
+
+
+// command characteristic 
+static const struct bt_uuid_128 vnd_cmd_uuid = BT_UUID_INIT_128(
+	BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef7));
+enum Commands{
+	NO_CMD = 0,
+	UPDATE = 1,
+};
+uint8_t cmd = NO_CMD;
+static ssize_t write_cmd(struct bt_conn *conn, const struct bt_gatt_attr *attr,
+			 const void *buf, uint16_t len, uint16_t offset,
+			 uint8_t flags)
+{
+	uint8_t *value = attr->user_data;
+
+	if (offset + len > sizeof(cmd)) {
+		return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
+	}
+
+	memcpy(value + offset, buf, len);
+
+    if (cmd != NO_CMD && cmd != UPDATE) {
+        cmd = NO_CMD;  // reject unrecognized values
+        return BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
+    }
+
+	return len;
+}
+
+// command --------------------------------------------------------------/
+
+
+// command feedback notification -------------------------------------------------------------->
+
+
+static const struct bt_uuid_128 vnd_cmd_feedback_uuid = BT_UUID_INIT_128(
+BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef8));
+enum CmdFeedbacks{
+	NO_FEEDBACK = 0,
+	OTA_UPDATE_READY = 1,
+	OTA_UPDATE_NOT_READY = 2,
+};
+uint8_t cmd_feedback = NO_FEEDBACK;
+static uint8_t cmd_feedback_notify_enabled;
+static void cmd_feedback_ccc_cfg_changed(const struct bt_gatt_attr *attr, uint16_t value)
+{
+	cmd_feedback_notify_enabled = (value == BT_GATT_CCC_NOTIFY) ? 1 : 0;
+}
+
+static ssize_t read_cmd_feedback(struct bt_conn *conn, const struct bt_gatt_attr *attr,
+			    void *buf, uint16_t len, uint16_t offset)
+{
+	return bt_gatt_attr_read(conn, attr, buf, len, offset,
+				  &cmd_feedback, sizeof(sensor_value));
+}
+
+// command feedback notification --------------------------------------------------------------/
 
 #define VND_MAX_LEN 20
 // #define BT_HR_HEARTRATE_DEFAULT_MIN 90U
@@ -336,8 +305,24 @@ BT_GATT_SERVICE_DEFINE(vnd_svc,
 	BT_GATT_CHARACTERISTIC(&vnd_msg_uuid.uuid,
 							BT_GATT_CHRC_WRITE,
 							BT_GATT_PERM_WRITE,
-							NULL, write_msg, &msg)
+							NULL, write_msg, &msg),
 	// message --------------------------->
+
+	// command --------------------------->
+	BT_GATT_CHARACTERISTIC(&vnd_cmd_uuid.uuid,
+							BT_GATT_CHRC_WRITE,
+							BT_GATT_PERM_WRITE,
+							NULL, write_cmd, &cmd)
+	// command --------------------------->
+
+	// command feedback ------------------------------------------------------>
+	BT_GATT_CHARACTERISTIC(&vnd_cmd_feedback_uuid.uuid,
+			       BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY,
+			       BT_GATT_PERM_READ,
+			       read_sensor, NULL, NULL),
+	BT_GATT_CCC(cmd_feedback_ccc_cfg_changed,
+		    BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+	// command feedback------------------------------------------------------>
 );
 
 static const struct bt_data ad[] = {
@@ -458,9 +443,30 @@ static struct bt_conn_auth_cb auth_cb_display = {
 };
 
 
-
+#include <firmware_update.h>
 int main(void)
 {
+	/*
+    int erro;
+	const struct flash_area* slot1_partition;
+    erro = flash_area_open(PARTITION_ID(slot1_partition), &slot1_partition);
+	const struct flash_area *image_update_partition;
+    erro = flash_area_open(PARTITION_ID(image_update_partition), &image_update_partition);
+	flash_area_erase(image_update_partition, 0, PARTITION_SIZE(image_update_partition));
+	flash_area_write(image_update_partition, 0, "hello, world", sizeof("hello, world"));
+	*/
+
+	//copy_update_partition();
+	
+	/*
+	char *message = malloc(32);
+	flash_area_read(slot1_partition, 0, message, strlen("hello, world"));
+	message[strlen("hello, world")] = '\0';
+	printf("Message is : %s /////////////////////////////", message);
+	*/
+
+	//swap_A_B_partitions();
+
 	/*
 	    if (!device_is_ready(apds9960)) {
         printk("APDS9960 not ready\n");
