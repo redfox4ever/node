@@ -3,5 +3,5 @@
 #include <zephyr/storage/flash_map.h>
 int copy_update_partition();
 void swap_A_B_partitions();
-
+void transfer_firmware();
 #endif

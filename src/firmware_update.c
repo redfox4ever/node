@@ -58,3 +58,9 @@ void swap_A_B_partitions(){
     k_sleep(K_SECONDS(5));
     sys_reboot(SYS_REBOOT_WARM);
 }
+
+void transfer_firmware(){
+
+    // get the payload size
+    
+}

@@ -17,8 +17,8 @@
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/services/ias.h>
 #include <sensor.h>
-
-
+#include <command.h>
+LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
 
 
 /* Custom Service Variables */
@@ -34,14 +34,40 @@ static const struct bt_uuid_128 vnd_enc_uuid = BT_UUID_INIT_128(
 static const struct bt_uuid_128 vnd_auth_uuid = BT_UUID_INIT_128(
 	BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef2));
 
+static const struct bt_uuid_128 vnd_long_uuid = BT_UUID_INIT_128(
+	BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef3));
 
+static struct bt_gatt_cep vnd_long_cep = {
+	.properties = BT_GATT_CEP_RELIABLE_WRITE,
+};
 
+static const struct bt_uuid_128 vnd_write_cmd_uuid = BT_UUID_INIT_128(
+	BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef4));
 
+static const struct bt_uuid_128 vnd_sensor_uuid = BT_UUID_INIT_128(
+BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef5));
 
 
 // message characteristic 
 static const struct bt_uuid_128 vnd_msg_uuid = BT_UUID_INIT_128(
 	BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef6));
+
+const struct bt_uuid_128 vnd_cmd_uuid = BT_UUID_INIT_128(
+	BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef7));
+
+static const struct bt_uuid_128 vnd_cmd_feedback_uuid = BT_UUID_INIT_128(
+BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef8));
+
+
+
+
+
+
+
+
+
+
+
 #define MSG_MAX_LEN 32
 char msg[MSG_MAX_LEN + 1] = {0};
 
@@ -64,8 +90,6 @@ static ssize_t write_msg(struct bt_conn *conn, const struct bt_gatt_attr *attr,
 
 
 // sensor notification -------------------------------------------------------->
-static const struct bt_uuid_128 vnd_sensor_uuid = BT_UUID_INIT_128(
-BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef5));
 static int16_t sensor_value = 0; 
 static uint8_t sensor_notify_enabled;
 static void sensor_ccc_cfg_changed(const struct bt_gatt_attr *attr, uint16_t value)
@@ -85,65 +109,6 @@ static ssize_t read_sensor(struct bt_conn *conn, const struct bt_gatt_attr *attr
 }
 // sensor notification -------------------------------------------------------->
 
-
-// command -------------------------------------------------------------->
-
-
-
-// command characteristic 
-static const struct bt_uuid_128 vnd_cmd_uuid = BT_UUID_INIT_128(
-	BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef7));
-enum Commands{
-	NO_CMD = 0,
-	UPDATE = 1,
-};
-uint8_t cmd = NO_CMD;
-static ssize_t write_cmd(struct bt_conn *conn, const struct bt_gatt_attr *attr,
-			 const void *buf, uint16_t len, uint16_t offset,
-			 uint8_t flags)
-{
-	uint8_t *value = attr->user_data;
-
-	if (offset + len > sizeof(cmd)) {
-		return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
-	}
-
-	memcpy(value + offset, buf, len);
-
-    if (cmd != NO_CMD && cmd != UPDATE) {
-        cmd = NO_CMD;  // reject unrecognized values
-        return BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
-    }
-
-	return len;
-}
-
-// command --------------------------------------------------------------/
-
-
-// command feedback notification -------------------------------------------------------------->
-
-
-static const struct bt_uuid_128 vnd_cmd_feedback_uuid = BT_UUID_INIT_128(
-BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef8));
-enum CmdFeedbacks{
-	NO_FEEDBACK = 0,
-	OTA_UPDATE_READY = 1,
-	OTA_UPDATE_NOT_READY = 2,
-};
-uint8_t cmd_feedback = NO_FEEDBACK;
-static uint8_t cmd_feedback_notify_enabled;
-static void cmd_feedback_ccc_cfg_changed(const struct bt_gatt_attr *attr, uint16_t value)
-{
-	cmd_feedback_notify_enabled = (value == BT_GATT_CCC_NOTIFY) ? 1 : 0;
-}
-
-static ssize_t read_cmd_feedback(struct bt_conn *conn, const struct bt_gatt_attr *attr,
-			    void *buf, uint16_t len, uint16_t offset)
-{
-	return bt_gatt_attr_read(conn, attr, buf, len, offset,
-				  &cmd_feedback, sizeof(sensor_value));
-}
 
 // command feedback notification --------------------------------------------------------------/
 
@@ -231,15 +196,6 @@ static ssize_t write_long_vnd(struct bt_conn *conn,
 	return len;
 }
 
-static const struct bt_uuid_128 vnd_long_uuid = BT_UUID_INIT_128(
-	BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef3));
-
-static struct bt_gatt_cep vnd_long_cep = {
-	.properties = BT_GATT_CEP_RELIABLE_WRITE,
-};
-
-static const struct bt_uuid_128 vnd_write_cmd_uuid = BT_UUID_INIT_128(
-	BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef4));
 
 
 static ssize_t write_without_rsp_vnd(struct bt_conn *conn,
@@ -312,16 +268,16 @@ BT_GATT_SERVICE_DEFINE(vnd_svc,
 	BT_GATT_CHARACTERISTIC(&vnd_cmd_uuid.uuid,
 							BT_GATT_CHRC_WRITE,
 							BT_GATT_PERM_WRITE,
-							NULL, write_cmd, &cmd)
+							NULL, write_cmd, &cmd),
 	// command --------------------------->
 
 	// command feedback ------------------------------------------------------>
 	BT_GATT_CHARACTERISTIC(&vnd_cmd_feedback_uuid.uuid,
 			       BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY,
 			       BT_GATT_PERM_READ,
-			       read_sensor, NULL, NULL),
+			       read_cmd_feedback, NULL, NULL),
 	BT_GATT_CCC(cmd_feedback_ccc_cfg_changed,
-		    BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+		    BT_GATT_PERM_READ | BT_GATT_PERM_WRITE)
 	// command feedback------------------------------------------------------>
 );
 
@@ -496,6 +452,11 @@ int main(void)
 	struct bt_gatt_attr *msg_attr = bt_gatt_find_by_uuid(vnd_svc.attrs, vnd_svc.attr_count,
 				    &vnd_msg_uuid.uuid);
 	printk("Sensor attr %p\n", msg_attr);
+
+	struct bt_gatt_attr *cmd_feedback_attr = bt_gatt_find_by_uuid(vnd_svc.attrs, vnd_svc.attr_count,
+				    &vnd_cmd_feedback_uuid.uuid);
+	printk("Sensor attr %p\n", msg_attr);
+
 	bt_ready();
 
 
@@ -511,7 +472,7 @@ int main(void)
 	sensor_init();
 	while (true) {
 		k_sleep(K_SECONDS(1));
-		printf("messga value: %s\n", msg);
+		//printf("messga value: %s\n", msg);
 
 		
 		///////////////////
@@ -558,6 +519,24 @@ int main(void)
 
 		if (sensor_notify_enabled) {
 			bt_gatt_notify(NULL, sensor_attr, &sensor_value, sizeof(sensor_value));
+		}
+
+
+		// managing commands
+		printf("%i", cmd);
+		switch (cmd)
+		{
+		case UPDATE_CMD:
+			LOG_INF("Update Command Received.\n");
+			cmd = NO_CMD;
+			send_feedback(OTA_UPDATE_READY, cmd_feedback_attr);
+			transfer_firmware();
+			//copy_update_partition();
+			//swap_A_B_partitions();
+			break;
+		
+		default:
+			break;
 		}
 	}
 	return 0;
