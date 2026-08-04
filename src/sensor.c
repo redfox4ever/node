@@ -44,7 +44,7 @@ static void sensor_work_handler(struct k_work *work) {
         return;
     }
 
-    //LOG_INF("Proximity reading: %d", apds9960_prox.val1);
+    LOG_INF("Proximity reading: %d", apds9960_prox.val1);
     err = k_work_reschedule_for_queue(	&sensor_workq,
                                         &sensor_work,
                                         K_MSEC(1000) );

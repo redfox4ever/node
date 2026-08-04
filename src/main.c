@@ -63,6 +63,11 @@ BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef8));
 static const struct bt_uuid_128 vnd_payload_size_uuid = BT_UUID_INIT_128(
 BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef9));
 
+static const struct bt_uuid_128 vnd_payload_chunk_uuid = BT_UUID_INIT_128(
+BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef10));
+
+static const struct bt_uuid_128 vnd_payload_chunk_feedback_uuid = BT_UUID_INIT_128(
+BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef11));
 
 
 
@@ -289,6 +294,22 @@ BT_GATT_SERVICE_DEFINE(vnd_svc,
 							BT_GATT_PERM_WRITE,
 							NULL, write_payload_size, &payload_size),
 	// payload size -------------------------->
+
+	// payload_chunk --------------------------->
+	BT_GATT_CHARACTERISTIC(&vnd_payload_chunk_uuid.uuid,
+							BT_GATT_CHRC_WRITE,
+							BT_GATT_PERM_WRITE,
+							NULL, write_payload_chunk, &payload_chunk),
+	// payload_chunk  -------------------------->
+
+	// payload_chunk_feedback  ------------------------------------------------------>
+	BT_GATT_CHARACTERISTIC(&vnd_payload_chunk_feedback_uuid.uuid,
+			       BT_GATT_CHRC_NOTIFY,
+			       BT_GATT_PERM_NONE,
+			       NULL, NULL, NULL),
+	BT_GATT_CCC(payload_chunk_feedback_ccc_cfg_changed,
+		    BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+	// payload_chunk_feedback------------------------------------------------------>
 );
 
 static const struct bt_data ad[] = {
@@ -323,6 +344,8 @@ enum{
 
 ATOMIC_DEFINE(connection_flag_bits, NUMBER_OF_CONNECTION_FLAGS);
 
+
+
 static void connected(struct bt_conn *conn, uint8_t err)
 {
 	if (err) {
@@ -331,6 +354,8 @@ static void connected(struct bt_conn *conn, uint8_t err)
 		printk("Connected\n");
 		atomic_set_bit(connection_flag_bits, CONNECTED_FLAG);
 	}
+
+
 }
 void start_advertising(){
 
@@ -460,11 +485,17 @@ int main(void)
 
 	struct bt_gatt_attr *msg_attr = bt_gatt_find_by_uuid(vnd_svc.attrs, vnd_svc.attr_count,
 				    &vnd_msg_uuid.uuid);
-	printk("Sensor attr %p\n", msg_attr);
+	
 
 	struct bt_gatt_attr *cmd_feedback_attr = bt_gatt_find_by_uuid(vnd_svc.attrs, vnd_svc.attr_count,
 				    &vnd_cmd_feedback_uuid.uuid);
-	printk("Sensor attr %p\n", msg_attr);
+
+
+	struct bt_gatt_attr *payload_chunk_feedback_attr = bt_gatt_find_by_uuid(vnd_svc.attrs, vnd_svc.attr_count,
+				    &vnd_payload_chunk_feedback_uuid.uuid);
+
+
+
 
 	bt_ready();
 
@@ -539,7 +570,7 @@ int main(void)
 			LOG_INF("Update Command Received.\n");
 			cmd = NO_CMD;
 			send_feedback(OTA_UPDATE_READY, cmd_feedback_attr);
-			transfer_firmware();
+			transfer_firmware(payload_chunk_feedback_attr);
 			//copy_update_partition();
 			//swap_A_B_partitions();
 			break;
