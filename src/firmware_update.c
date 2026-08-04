@@ -1,9 +1,8 @@
 #include <firmware_update.h>
-#include <stdio.h>
-#include <zephyr/dfu/mcuboot.h>
-#include <zephyr/toolchain.h>
-#include <zephyr/kernel.h>
-#include <zephyr/sys/reboot.h>
+
+
+LOG_MODULE_REGISTER(firmware_update, LOG_LEVEL_INF);
+
 
 #define TRANSFER_BUFF_SIZE 256
 int copy_update_partition(){
@@ -59,8 +58,58 @@ void swap_A_B_partitions(){
     sys_reboot(SYS_REBOOT_WARM);
 }
 
+
+
+
+int32_t payload_size;
+bool payload_flag = false;
+
+bool is_payload_flag_up(){
+    if(payload_flag == true){
+        payload_flag = false;
+        return true;
+    }
+    return false;
+}
+
+ssize_t write_payload_size(struct bt_conn *conn, const struct bt_gatt_attr *attr,
+			 const void *buf, uint16_t len, uint16_t offset,
+			 uint8_t flags)
+{
+    LOG_INF("Receiving a new payload size.\n");
+    LOG_INF("Offset: %i, Lenght: %i.\n", offset, len);
+	uint8_t *value = attr->user_data;
+
+	if (offset + len > sizeof(payload_size)) {
+        LOG_ERR("Data len + offset is too big for [payload_size] .");
+		return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
+	}
+
+	memcpy(value + offset, buf, len);
+    LOG_INF("[payload_size] : %i.\n", payload_size);
+    if (payload_size <= 0) {
+        LOG_ERR("[payload_size] is too small.");
+        return BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
+    }
+
+    if(payload_flag == true)    LOG_ERR("[payload_flag] is already true, meaning it hasn't"
+                                "been correctly reset.");
+    payload_flag = true;
+
+	return len;
+}
+
+
+
+
 void transfer_firmware(){
 
     // get the payload size
+    while(true){
+        if(is_payload_flag_up()){
+            LOG_INF("LOG_INF output [payload_size] has been received. %d\n", payload_size);
+            printf(" printf output [payload_size] has been received. %d\n", payload_size);
+        }
+    }
     
 }

@@ -18,6 +18,8 @@
 #include <zephyr/bluetooth/services/ias.h>
 #include <sensor.h>
 #include <command.h>
+#include <firmware_update.h>
+
 LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
 
 
@@ -58,7 +60,8 @@ const struct bt_uuid_128 vnd_cmd_uuid = BT_UUID_INIT_128(
 static const struct bt_uuid_128 vnd_cmd_feedback_uuid = BT_UUID_INIT_128(
 BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef8));
 
-
+static const struct bt_uuid_128 vnd_payload_size_uuid = BT_UUID_INIT_128(
+BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef9));
 
 
 
@@ -277,8 +280,15 @@ BT_GATT_SERVICE_DEFINE(vnd_svc,
 			       BT_GATT_PERM_READ,
 			       read_cmd_feedback, NULL, NULL),
 	BT_GATT_CCC(cmd_feedback_ccc_cfg_changed,
-		    BT_GATT_PERM_READ | BT_GATT_PERM_WRITE)
+		    BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
 	// command feedback------------------------------------------------------>
+
+	// payload size --------------------------->
+	BT_GATT_CHARACTERISTIC(&vnd_payload_size_uuid.uuid,
+							BT_GATT_CHRC_WRITE,
+							BT_GATT_PERM_WRITE,
+							NULL, write_payload_size, &payload_size),
+	// payload size -------------------------->
 );
 
 static const struct bt_data ad[] = {
@@ -399,7 +409,6 @@ static struct bt_conn_auth_cb auth_cb_display = {
 };
 
 
-#include <firmware_update.h>
 int main(void)
 {
 	/*
@@ -429,7 +438,7 @@ int main(void)
         return 0;
     }
 		*/
-	printf("getting started ...");
+	printf("getting started ...\n");
 
 	struct bt_gatt_attr *vnd_ind_attr;
 	char str[BT_UUID_STR_LEN];
