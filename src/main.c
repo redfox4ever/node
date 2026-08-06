@@ -571,8 +571,9 @@ int main(void)
 			cmd = NO_CMD;
 			send_feedback(OTA_UPDATE_READY, cmd_feedback_attr);
 			transfer_firmware(payload_chunk_feedback_attr);
-			//copy_update_partition();
-			//swap_A_B_partitions();
+			k_sleep(K_MSEC(5000));
+			copy_update_partition();
+			swap_A_B_partitions();
 			break;
 		
 		default:

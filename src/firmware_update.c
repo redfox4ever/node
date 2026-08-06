@@ -92,6 +92,10 @@ ssize_t write_payload_size(struct bt_conn *conn, const struct bt_gatt_attr *attr
         return BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
     }
 
+    if (payload_size > PARTITION_SIZE(image_update_partition)) {
+        printf("[payload_size] is too big for %d.", PARTITION_SIZE(image_update_partition)); // ERR
+        return BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
+    }
     if(payload_size_flag == true)    printf("[payload_flag] is already true, meaning it hasn't"
                                 "been correctly reset."); // ERR
     payload_size_flag = true;
@@ -217,6 +221,7 @@ void transfer_firmware(struct bt_gatt_attr *pc_feedback_attr){
             break;
         }
     }
+    printf("uploading the firmware is done.\n");
     flash_area_close(image_update_partition);
     
 }
